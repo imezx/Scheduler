@@ -13,7 +13,7 @@ include = [
     "LICENSE",
     "wally.toml",
 ]
-description = "Performance measurement tool built with Vide."
+description = "A performance measurement tool built with Vide."
 
 [dependencies]
 pebble = "alicesaidhi/pebble@0.1.2"
