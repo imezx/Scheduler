@@ -27,7 +27,7 @@ type socket_transcript_type_inner = {
 }
 type socket_transcript_type = { socket_transcript_type_inner }
 
-local activeTimers: { [string]: { number } } = {}
+local activeTimers: { [thread]: { name: string, startTime: number } } = {}
 local frameSystems: { { Name: string, Duration: number, Color: Color3 } } = {}
 local isPaused = false
 local colorCache: { [string]: Color3 } = {}
@@ -137,11 +137,15 @@ Profiler.Begin = function(name: string)
 	if isPaused or not profiler_state then
 		return
 	end
-	if not activeTimers[name] then
-		activeTimers[name] = {}
+	-- using thread based is the best solution for race condition issues.
+	local currentThread: thread = coroutine.running()
+	if activeTimers[currentThread] then
+		return
 	end
-
-	table.insert(activeTimers[name], os.clock())
+	activeTimers[currentThread] = {
+		name = name,
+		startTime = os.clock(),
+	}
 end
 
 Profiler.End = function(name: string)
@@ -149,14 +153,15 @@ Profiler.End = function(name: string)
 	if isPaused or not profiler_state then
 		return
 	end
-	local timerStack: { number } = activeTimers[name]
-	if not timerStack or not next(timerStack) then
+	local currentThread: thread = coroutine.running()
+	local timerStack: { name: string, startTime: number }? = activeTimers[currentThread]
+	activeTimers[currentThread] = nil -- ensure its removed to prevent unwanted memory leaks
+	if not timerStack or timerStack.name ~= name then
 		return
 	end
-	local startTime: number = table.remove(timerStack, 1) :: number
 	table.insert(frameSystems, {
 		Name = name,
-		Duration = (endTime - startTime),
+		Duration = (endTime - timerStack.startTime),
 		Color = generateColor(name),
 	})
 	if (endTime - lastUpdated) >= 1 then
