@@ -1,0 +1,20 @@
+[package]
+name = "imezx/scheduler"
+version = "0.1.0"
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "shared"
+license = "MIT"
+authors = ["EternityDev"]
+exclude = ["**"]
+include = [
+    "default.project.json",
+    "src",
+	"src/**",
+    "LICENSE",
+    "wally.toml",
+]
+description = "Performance measurement tool built with Vide."
+
+[dependencies]
+pebble = "alicesaidhi/pebble@0.1.2"
+vide = "centau/vide@0.3.1"
