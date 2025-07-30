@@ -5,7 +5,7 @@ local ContextActionService = game:GetService("ContextActionService")
 local CollectionService = game:GetService("CollectionService")
 local localPlayer = game:GetService("Players").LocalPlayer
 
-local vide = require("../Packages/vide")
+local vide = require("../vide")
 local remotes = require("@self/remotes/Remotes")
 local Profiler = require("./profiler")
 local home_app = require("./ui/home")
@@ -41,7 +41,7 @@ client.init = function()
 end
 
 client.toggle_widget = function(_, state: Enum.UserInputState)
-	if state ~= Enum.UserInputState.End then
+	if state and state ~= Enum.UserInputState.End then
 		return
 	end
 	-- cleanup

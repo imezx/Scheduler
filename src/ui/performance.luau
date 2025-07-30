@@ -1,6 +1,6 @@
 --!optimize 2
-local vide = require("../../Packages/vide")
-local pebble = require("../../Packages/pebble")
+local vide = require("../../vide")
+local pebble = require("../../pebble")
 local Profiler = require("../profiler")
 
 local create = vide.create

@@ -1,6 +1,6 @@
 --!optimize 2
-local vide = require("../../Packages/vide")
-local pebble = require("../../Packages/pebble")
+local vide = require("../../vide")
+local pebble = require("../../pebble")
 local stack_bar = require("./stack_bar")
 
 type SchedulerProps = {

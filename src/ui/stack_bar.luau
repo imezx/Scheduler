@@ -1,5 +1,5 @@
 --!optimize 2
-local vide = require("../../Packages/vide")
+local vide = require("../../vide")
 
 local create = vide.create
 local indexes = vide.indexes

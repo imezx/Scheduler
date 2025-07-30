@@ -4,7 +4,7 @@
 local Profiler = {}
 
 local IsServer: boolean = game:GetService("RunService"):IsServer()
-local vide = require("../Packages/vide")
+local vide = require("../vide")
 local convert_scale = require("./util/convert_scale")
 local Signal = require("./util/limesignal")
 
@@ -27,7 +27,7 @@ type socket_transcript_type_inner = {
 }
 type socket_transcript_type = { socket_transcript_type_inner }
 
-local activeTimers: { [string]: number } = {}
+local activeTimers: { [string]: { number } } = {}
 local frameSystems: { { Name: string, Duration: number, Color: Color3 } } = {}
 local isPaused = false
 local colorCache: { [string]: Color3 } = {}
@@ -124,9 +124,7 @@ Profiler.merge = function(map_value: { { Name: string, Duration: number, Color: 
 		end
 	end
 	for _, system in merged do
-		if system.Count > 0 then
-			system.Duration = system.Duration / system.Count
-		end
+		system.Duration /= system.Count
 	end
 	if update_state == nil or update_state then
 		state(merged)
@@ -139,7 +137,11 @@ Profiler.Begin = function(name: string)
 	if isPaused or not profiler_state then
 		return
 	end
-	activeTimers[name] = os.clock()
+	if not activeTimers[name] then
+		activeTimers[name] = {}
+	end
+
+	table.insert(activeTimers[name], os.clock())
 end
 
 Profiler.End = function(name: string)
@@ -147,11 +149,11 @@ Profiler.End = function(name: string)
 	if isPaused or not profiler_state then
 		return
 	end
-	local startTime: number = activeTimers[name]
-	if not startTime then
+	local timerStack: { number } = activeTimers[name]
+	if not timerStack or not next(timerStack) then
 		return
 	end
-	activeTimers[name] = nil
+	local startTime: number = table.remove(timerStack, 1) :: number
 	table.insert(frameSystems, {
 		Name = name,
 		Duration = (endTime - startTime),

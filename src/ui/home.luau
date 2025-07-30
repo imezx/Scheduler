@@ -1,6 +1,6 @@
 --!optimize 2
-local pebble = require("../../Packages/pebble")
-local vide = require("../../Packages/vide")
+local pebble = require("../../pebble")
+local vide = require("../../vide")
 
 local spawn_app = require("./spawn_app")
 local scheduler_app = require("./scheduler")

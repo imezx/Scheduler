@@ -3,7 +3,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Stats = game:GetService("Stats")
 
-local vide = require("../../Packages/vide")
+local vide = require("../../vide")
 local remotes = require("./remotes/Remotes")
 
 local get_performance_socket = remotes.fromFunction("scheduler.get_performance_socket")

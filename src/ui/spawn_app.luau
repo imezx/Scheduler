@@ -3,7 +3,7 @@
 --!optimize 2
 local Players = game:GetService("Players")
 
-local vide = require("../../Packages/vide")
+local vide = require("../../vide")
 
 local destroy_fn: { [() -> ()]: boolean } = {}
 
