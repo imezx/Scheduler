@@ -100,81 +100,78 @@ return function(props: HomeProps)
 								size = UDim2.new(1, 0, 0, 30),
 								text = menu,
 								activated = function()
-									local app = menu == "scheduler"
-										and spawn_app.spawn_app(app_constructor, {
+									if menu == "scheduler" then
+										if value.env == "Client" and client_app_ui then
+											client_app_ui()
+											client_app_ui = nil
+										elseif value.env == "Server" and server_app_ui then
+											server_app_ui()
+											server_app_ui = nil
+										end
+
+										local newApp = spawn_app.spawn_app(app_constructor, {
 											env = value.env,
 											Position = value.Position,
-											ProfilerState = value.env == "Server" and props.Profiler.get_stored(
-												"server_frame_value"
-											) or props.Profiler.dump_state(),
+											ProfilerState = value.env == "Server"
+												and props.Profiler.get_stored("server_frame_value")
+												or props.Profiler.dump_state(),
 											Runtime = value.env == "Server"
 												and props.Profiler.get_stored("server_runtime"),
 											Pause = function()
 												if value.env == "Server" then
 													props.profiler_state:FireServer(false)
-													return
+												else
+													props.Profiler.Pause()
 												end
-												props.Profiler.Pause()
 											end,
 											Resume = function()
 												if value.env == "Server" then
 													props.profiler_state:FireServer(true)
-													return
+												else
+													props.Profiler.Resume()
 												end
-												props.Profiler.Resume()
 											end,
 											onClose = function()
 												if value.env == "Client" and client_app_ui then
-													pcall(client_app_ui)
+													client_app_ui()
 													client_app_ui = nil
-												elseif server_app_ui then
-													pcall(server_app_ui)
+												elseif value.env == "Server" and server_app_ui then
+													server_app_ui()
 													server_app_ui = nil
 												end
-												if
-													not client_app_ui
-													and not server_app_ui
-													and not performance_app_ui
-													and not home_app_ui
-												then
+												if not client_app_ui and not server_app_ui and not performance_app_ui and not home_app_ui then
 													spawn_app.unmount_all()
 													props.onDestroy()
 												end
 											end,
 										})
-									if value.env == "Client" then
-										if app then
-											client_app_ui = app
+
+										if value.env == "Client" then
+											client_app_ui = newApp
+										else
+											server_app_ui = newApp
 										end
-										if menu == "performance" then
-											if performance_app_ui then
-												pcall(performance_app_ui)
-												performance_app_ui = nil
-											end
-											performance_app_ui = spawn_app.spawn_app(app_constructor, {
-												performanceData = props.Profiler.sockets_transcript(),
-												IsVisible = true,
-												onClose = function()
-													if performance_app_ui then
-														pcall(performance_app_ui)
-														performance_app_ui = nil
-													end
-													if
-														not client_app_ui
-														and not server_app_ui
-														and not performance_app_ui
-														and not home_app_ui
-													then
-														spawn_app.unmount_all()
-														props.onDestroy()
-													end
-												end,
-											})
+
+									elseif menu == "performance" then
+										if performance_app_ui then
+											performance_app_ui()
+											performance_app_ui = nil
 										end
-									else
-										if app then
-											server_app_ui = app
-										end
+
+										performance_app_ui = spawn_app.spawn_app(app_constructor, {
+											performanceData = props.Profiler.sockets_transcript(),
+											IsVisible = true,
+											onClose = function()
+												if performance_app_ui then
+													performance_app_ui()
+													performance_app_ui = nil
+												end
+												if not client_app_ui and not server_app_ui and not performance_app_ui and not home_app_ui then
+													spawn_app.unmount_all()
+													props.onDestroy()
+												end
+											end,
+										})
 									end
 								end,
 							})
