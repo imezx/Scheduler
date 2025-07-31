@@ -54,7 +54,7 @@ server.init = function(Profiler)
 		if
 			type(socketId) ~= "string"
 			or type(packet) ~= "buffer"
-			or buffer.len(packet) >= 64
+			or buffer.len(packet) ~= 40
 			or not active_sockets[sender]
 			or active_sockets[sender] ~= socketId
 		then
@@ -75,6 +75,7 @@ server.init = function(Profiler)
 	end)
 
 	local average_heartbeat: number = 0
+	local average_frames: number = 0
 	local render_gpu_frame_time: number = 0
 	local render_cpu_frame_time: number = 0
 	local counter: number = 0
@@ -85,6 +86,7 @@ server.init = function(Profiler)
 		acccumulate += dt
 
 		average_heartbeat += Stats.HeartbeatTime
+		average_frames += dt
 		render_gpu_frame_time += Stats.RenderGPUFrameTime
 		render_cpu_frame_time += Stats.RenderCPUFrameTime
 
@@ -92,11 +94,12 @@ server.init = function(Profiler)
 			if next(active_sockets) then
 				local runTime: string = convert_units("s", Profiler.RunTime())
 				local exported_scheduler: { { Name: string, Duration: number, Color: Color3 } } = Profiler.dump_frames()
-				local b: buffer = buffer.create(16)
-				buffer.writef32(b, 0, average_heartbeat / counter)
-				buffer.writef32(b, 4, render_gpu_frame_time / counter)
-				buffer.writef32(b, 8, render_cpu_frame_time / counter)
-				buffer.writef32(b, 12, Stats:GetTotalMemoryUsageMb() * 1e3 * 1e3)
+				local b: buffer = buffer.create(40)
+				buffer.writef64(b, 0, average_heartbeat / counter)
+				buffer.writef64(b, 8, average_frames / counter)
+				buffer.writef64(b, 16, render_gpu_frame_time / counter)
+				buffer.writef64(b, 24, render_cpu_frame_time / counter)
+				buffer.writef64(b, 32, Stats:GetTotalMemoryUsageMb() * 1e3 * 1e3)
 
 				for socket: Player in active_sockets do
 					if not socket or not socket.Parent then
@@ -110,7 +113,7 @@ server.init = function(Profiler)
 			end
 			if next(_queue) then
 				for host: Player, packet: buffer in _queue do
-					if not host or not host.Parent then
+					if not host or not host.Parent or buffer.len(packet) ~= 40 then
 						_queue[host] = nil
 						continue
 					end
@@ -129,6 +132,7 @@ server.init = function(Profiler)
 			end
 
 			average_heartbeat = 0
+			average_frames = 0
 			render_gpu_frame_time = 0
 			render_cpu_frame_time = 0
 			acccumulate -= SEND_EVERY

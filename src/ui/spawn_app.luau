@@ -11,13 +11,14 @@ local function unmount_all()
 	for destroy in destroy_fn do
 		destroy()
 	end
+	table.clear(destroy_fn)
 end
 
 local function spawn_app<T>(app, props: T): () -> ()
 	return vide.root(function(destroy)
 		local destroy = function()
 			destroy_fn[destroy] = nil
-			destroy()
+			pcall(destroy)
 		end
 
 		local application = app(props)

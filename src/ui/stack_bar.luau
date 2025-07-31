@@ -13,7 +13,6 @@ return function(props: stack_bar)
 	return create("Frame")({
 		Name = "Graph",
 		Size = UDim2.new(1, 0, 0, 32),
-
 		indexes(props.values, function(value, index)
 			local data = value()
 			return create("Frame")({

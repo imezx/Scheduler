@@ -10,7 +10,7 @@ type HomeProps = {
 	env: string,
 	Profiler: any,
 	profiler_state: RemoteEvent,
-	Performance: { [string]: () -> () },
+	version: string,
 
 	onClose: () -> (),
 	onDestroy: () -> (),
@@ -44,6 +44,7 @@ local home_app_ui, performance_app_ui, server_app_ui, client_app_ui
 return function(props: HomeProps)
 	home_app_ui = pebble.widget({
 		title = "Home",
+		subtitle = `v{props.version}`,
 		min_size = Vector2.new(230, 200),
 		bind_to_close = props.onClose,
 
@@ -124,10 +125,10 @@ return function(props: HomeProps)
 											end,
 											onClose = function()
 												if value.env == "Client" and client_app_ui then
-													client_app_ui()
+													pcall(client_app_ui)
 													client_app_ui = nil
 												elseif server_app_ui then
-													server_app_ui()
+													pcall(server_app_ui)
 													server_app_ui = nil
 												end
 												if
@@ -147,7 +148,7 @@ return function(props: HomeProps)
 										end
 										if menu == "performance" then
 											if performance_app_ui then
-												performance_app_ui()
+												pcall(performance_app_ui)
 												performance_app_ui = nil
 											end
 											performance_app_ui = spawn_app.spawn_app(app_constructor, {
@@ -155,7 +156,7 @@ return function(props: HomeProps)
 												IsVisible = true,
 												onClose = function()
 													if performance_app_ui then
-														performance_app_ui()
+														pcall(performance_app_ui)
 														performance_app_ui = nil
 													end
 													if

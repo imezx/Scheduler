@@ -20,6 +20,7 @@ local derive = vide.derive
 local values = vide.values
 local action = vide.action
 local cleanup = vide.cleanup
+local effect = vide.effect
 
 local function changed(property: string, fn: (...any) -> ())
 	return action(function(instance)
@@ -38,7 +39,7 @@ local sort_by_options = {
 }
 
 local function to_computeTime(time: number): string
-	if type(time) ~= "number" then
+	if type(time) ~= "number" or time ~= time then
 		return "unknown"
 	end
 	if time >= 1 then
@@ -58,19 +59,11 @@ local function to_computeTime(time: number): string
 end
 
 return function(props: SchedulerProps)
-	local selected = source(0)
-	local sort_by = source(2)
-
-	local max_frametime = derive(function()
-		local max: number = 0
-		for _, system in props.ProfilerState() do
-			max = math.max(max, system.Duration)
-		end
-		return max
-	end)
+	local selected: (number?) -> number = source(0)
+	local sort_by: (number?) -> number = source(2)
 
 	-- Derived state for total runtime
-	local totalRuntime = derive(function()
+	local totalRuntime: () -> number = derive(function()
 		local total: number = 0
 		for _, system in props.ProfilerState() do
 			total += system.Duration
@@ -80,7 +73,7 @@ return function(props: SchedulerProps)
 
 	-- Derived state for the timeline segments
 	local timelineSegments = derive(function()
-		local total = totalRuntime()
+		local total: number = totalRuntime()
 		if total == 0 then
 			return {}
 		end
@@ -98,6 +91,7 @@ return function(props: SchedulerProps)
 
 	local function assign_frame(data: { Name: string, Color: Color3, Size: UDim2, Duration: number })
 		local gui_state = source(Enum.GuiState.Idle)
+		local _frame: Frame
 		local b = create("ImageButton")({
 			Name = data.Name,
 			Size = UDim2.new(1, 0, 0, 32),
@@ -115,16 +109,24 @@ return function(props: SchedulerProps)
 			MouseButton2Click = function()
 				props.Pause()
 			end,
-
 			create("Folder")({
-				create("Frame")({
-					Position = UDim2.new(0, 0, 1, 4),
-					AnchorPoint = Vector2.new(0, 1),
-					Size = function()
-						return UDim2.new(data.Duration / max_frametime(), 0, 0, 1)
-					end,
-					BackgroundColor3 = pebble.theme.fg_on_bg_high[0],
-				}),
+				(function()
+					_frame = create("Frame")({
+						Position = UDim2.new(0, 0, 1, 4),
+						AnchorPoint = Vector2.new(0, 1),
+						Size = function()
+							return UDim2.new(data.Duration / totalRuntime(), 0, 0, 1)
+						end,
+						BackgroundColor3 = pebble.theme.fg_on_bg_high[0],
+					})
+					return _frame
+				end)(),
+				effect(function()
+					if not _frame then
+						return
+					end
+					_frame.Size = UDim2.new(data.Duration / totalRuntime(), 0, 0, 1)
+				end),
 			}),
 
 			create("UIStroke")({
@@ -251,7 +253,7 @@ return function(props: SchedulerProps)
 
 				options = sort_by_options,
 				selected = sort_by,
-				update_selected = function(new)
+				update_selected = function(new: number)
 					sort_by(new)
 				end,
 			}),

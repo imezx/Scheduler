@@ -6,17 +6,18 @@ local CollectionService = game:GetService("CollectionService")
 local localPlayer = game:GetService("Players").LocalPlayer
 
 local vide = require("../vide")
-local remotes = require("@self/remotes/Remotes")
 local Profiler = require("./profiler")
-local home_app = require("./ui/home")
 local client_performance = require("@self/performance")
+local remotes = require("@self/remotes/Remotes")
+local spawn_app = require("./ui/spawn_app")
+local home_app = require("./ui/home")
 
 local unbind_performance_socket = remotes.fromEvent("scheduler.unbind_performance_socket")
 local profiler_state = remotes.fromEvent("scheduler.profiler_state")
 
 local server_frame_value = vide.source({})
 
-local rootScope, root_performance, home_app_ui
+local version: string, rootScope, root_performance, home_app_ui
 Profiler.store("server_frame_value", server_frame_value)
 
 local function onStateChanged(instance: Instance?)
@@ -28,6 +29,10 @@ local function onStateChanged(instance: Instance?)
 	else
 		script.Parent.profiler:SetAttribute("__state__", false)
 	end
+end
+
+client.assign_ver = function(ver: string)
+	version = ver
 end
 
 client.init = function()
@@ -51,14 +56,24 @@ client.toggle_widget = function(_, state: Enum.UserInputState)
 	end
 	if not localPlayer:HasTag("__allowedScheduler__") or rootScope then
 		unbind_performance_socket:FireServer()
+		profiler_state:FireServer(false)
+		Profiler.Pause()
 		if rootScope then
 			rootScope()
 			rootScope = nil
 		end
+		home_app_ui = nil
 		Profiler.reset()
+		spawn_app.unmount_all()
+		return
+	end
+	if home_app_ui then
 		return
 	end
 	root_performance = client_performance.run(Profiler)
+	profiler_state:FireServer(true)
+	Profiler.Resume()
+	Profiler.reset()
 	rootScope = vide.root(function()
 		-- Server Scheduler
 		home_app_ui = home_app({
@@ -67,6 +82,7 @@ client.toggle_widget = function(_, state: Enum.UserInputState)
 			profiler_state = profiler_state,
 			ProfilerState = Profiler.get_stored("server_frame_value"),
 			Runtime = Profiler.get_stored("server_runtime"),
+			version = version,
 
 			onClose = function()
 				if home_app_ui then
@@ -74,11 +90,15 @@ client.toggle_widget = function(_, state: Enum.UserInputState)
 				end
 			end,
 			onDestroy = function()
+				profiler_state:FireServer(false)
+				Profiler.Pause()
+				home_app_ui = nil
 				if not rootScope then
 					return
 				end
 				rootScope()
 				rootScope = nil
+				spawn_app.unmount_all()
 			end,
 		})
 		home_app_ui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui", 9e9)

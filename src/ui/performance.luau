@@ -13,6 +13,7 @@ local function parse(data)
 		{ key = "host", displayName = "Host" },
 		{ key = "memory", displayName = "Memory Usage" },
 		{ key = "cpu", displayName = "CPU" },
+		{ key = "frames", displayName = "FPS" },
 		{ key = "gpu", displayName = "GPU" },
 		{ key = "cpuRender", displayName = "CPU Render" },
 	}
@@ -39,10 +40,10 @@ return function(props)
 	local performanceData = source(parse(props.performanceData))
 
 	Profiler.onSocketChanged:disconnectAll()
-	Profiler.onSocketChanged:connect(function()
+	cleanup(Profiler.onSocketChanged:connect(function()
 		local parse = parse(Profiler.sockets_transcript())
 		performanceData(parse)
-	end)
+	end))
 
 	return pebble.widget({
 		title = "Performance",

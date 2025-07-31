@@ -14,6 +14,7 @@ local lastUpdated: number, profiler_state: boolean = os.clock(), IsServer
 type socket_array_map = {
 	memory: number,
 	heartbeat_time: number,
+	frames_time: number,
 	render_gpu_time: number,
 	render_cpu_time: number,
 }
@@ -22,6 +23,7 @@ type socket_transcript_type_inner = {
 	host: string,
 	memory: string,
 	cpu: string,
+	frames: string,
 	gpu: string,
 	cpuRender: string,
 }
@@ -78,11 +80,16 @@ end
 Profiler.sockets_transcript = function(): socket_transcript_type
 	local idx: number, transcript: socket_transcript_type = 1, {}
 	for host: Player | string, map: socket_array_map in sockets do
+		local frame_time: number = 1 / (map.frames_time or 1)
+		if frame_time ~= frame_time or frame_time == math.huge then
+			frame_time = 0
+		end
 		table.insert(transcript, {
 			id = idx,
 			host = type(host) == "string" and host or (host :: Player).Name,
 			memory = convert_scale("B", map.memory),
 			cpu = convert_scale("s", map.heartbeat_time or 0),
+			frames = string.format("%.2f", frame_time),
 			gpu = convert_scale("s", map.render_gpu_time or 0),
 			cpuRender = convert_scale("s", map.render_cpu_time or 0),
 		})
@@ -155,7 +162,7 @@ Profiler.End = function(name: string)
 	end
 	local currentThread: thread = coroutine.running()
 	local timerStack: { name: string, startTime: number }? = activeTimers[currentThread]
-	activeTimers[currentThread] = nil -- ensure its removed to prevent unwanted memory leaks
+	activeTimers[currentThread] = nil -- make sure it remove to prevent memory leaks
 	if not timerStack or timerStack.name ~= name then
 		return
 	end
