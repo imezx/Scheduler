@@ -55,15 +55,15 @@ client.toggle_widget = function(_, state: Enum.UserInputState)
 		root_performance = nil
 	end
 	if not localPlayer:HasTag("__allowedScheduler__") or rootScope then
-		unbind_performance_socket:FireServer()
+		home_app_ui = nil
 		profiler_state:FireServer(false)
+		unbind_performance_socket:FireServer()
+		Profiler.reset()
 		Profiler.Pause()
 		if rootScope then
 			rootScope()
 			rootScope = nil
 		end
-		home_app_ui = nil
-		Profiler.reset()
 		spawn_app.unmount_all()
 		return
 	end
@@ -72,8 +72,8 @@ client.toggle_widget = function(_, state: Enum.UserInputState)
 	end
 	root_performance = client_performance.run(Profiler)
 	profiler_state:FireServer(true)
-	Profiler.Resume()
 	Profiler.reset()
+	Profiler.Resume()
 	rootScope = vide.root(function()
 		-- Server Scheduler
 		home_app_ui = home_app({
@@ -90,9 +90,11 @@ client.toggle_widget = function(_, state: Enum.UserInputState)
 				end
 			end,
 			onDestroy = function()
-				profiler_state:FireServer(false)
-				Profiler.Pause()
 				home_app_ui = nil
+				profiler_state:FireServer(false)
+				unbind_performance_socket:FireServer()
+				Profiler.reset()
+				Profiler.Pause()
 				if not rootScope then
 					return
 				end

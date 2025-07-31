@@ -2,6 +2,7 @@
 --!optimize 2
 --!native
 local Profiler = {}
+Profiler.isRunning = false
 
 local IsServer: boolean = game:GetService("RunService"):IsServer()
 local vide = require("../vide")
@@ -31,12 +32,11 @@ type socket_transcript_type = { socket_transcript_type_inner }
 
 local activeTimers: { [thread]: { name: string, startTime: number } } = {}
 local frameSystems: { { Name: string, Duration: number, Color: Color3 } } = {}
-local isPaused = false
 local colorCache: { [string]: Color3 } = {}
 local sockets: { [Player | string]: socket_array_map } = {}
 local stores: { [string]: any } = {}
 
-local state = vide.source({})
+local state: (any) -> { any } = vide.source({})
 
 local function generateColor(str: string): Color3
 	if colorCache[str] then
@@ -55,10 +55,10 @@ local function generateColor(str: string): Color3
 end
 
 Profiler.reset = function()
-	isPaused = true
+	Profiler.isRunning = false
 	table.clear(activeTimers)
 	table.clear(frameSystems)
-	isPaused = false
+	Profiler.isRunning = true
 end
 
 -- Sockets
@@ -141,7 +141,7 @@ Profiler.merge = function(map_value: { { Name: string, Duration: number, Color: 
 end
 
 Profiler.Begin = function(name: string)
-	if isPaused or not profiler_state then
+	if not Profiler.isRunning or not profiler_state then
 		return
 	end
 	-- using thread based is the best solution for race condition issues.
@@ -157,12 +157,12 @@ end
 
 Profiler.End = function(name: string)
 	local endTime: number = os.clock()
-	if isPaused or not profiler_state then
+	if not Profiler.isRunning or not profiler_state then
 		return
 	end
 	local currentThread: thread = coroutine.running()
 	local timerStack: { name: string, startTime: number }? = activeTimers[currentThread]
-	activeTimers[currentThread] = nil -- make sure it remove to prevent memory leaks
+	activeTimers[currentThread] = nil -- ensure its removed to prevent unwanted memory leaks
 	if not timerStack or timerStack.name ~= name then
 		return
 	end
@@ -178,11 +178,11 @@ Profiler.End = function(name: string)
 end
 
 Profiler.Pause = function()
-	isPaused = true
+	Profiler.isRunning = false
 end
 
 Profiler.Resume = function()
-	isPaused = false
+	Profiler.isRunning = true
 end
 
 Profiler.dump_state = function()
@@ -190,12 +190,7 @@ Profiler.dump_state = function()
 end
 
 Profiler.dump_frames = function(): { { Name: string, Duration: number, Color: Color3 } }
-	if isPaused then
-		return frameSystems
-	end
-	local exported = table.clone(frameSystems)
-	table.clear(frameSystems)
-	return exported
+	return frameSystems
 end
 
 -- Misc

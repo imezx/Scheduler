@@ -71,24 +71,6 @@ return function(props: SchedulerProps)
 		return total
 	end)
 
-	-- Derived state for the timeline segments
-	local timelineSegments = derive(function()
-		local total: number = totalRuntime()
-		if total == 0 then
-			return {}
-		end
-		local segments = {}
-		for _, system in props.ProfilerState() do
-			table.insert(segments, {
-				Name = system.Name,
-				Color = system.Color,
-				Size = UDim2.fromScale(system.Duration / total, 1),
-				Duration = system.Duration,
-			})
-		end
-		return segments
-	end)
-
 	local function assign_frame(data: { Name: string, Color: Color3, Size: UDim2, Duration: number })
 		local gui_state = source(Enum.GuiState.Idle)
 		local _frame: Frame
@@ -96,7 +78,7 @@ return function(props: SchedulerProps)
 			Name = data.Name,
 			Size = UDim2.new(1, 0, 0, 32),
 			LayoutOrder = function()
-				return if sort_by() == 3 then 1e9 - data.Duration * 1e8 else 1
+				return 1e9 - data.Duration * 1e8
 			end,
 			BackgroundColor3 = function()
 				return if gui_state() == Enum.GuiState.Press
@@ -229,7 +211,7 @@ return function(props: SchedulerProps)
 					}),
 
 					stack_bar({
-						values = timelineSegments,
+						values = props.ProfilerState,
 						selected = selected,
 					}),
 

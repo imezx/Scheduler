@@ -17,7 +17,7 @@ scheduler.client = function()
 		return client
 	end
 	client = require("@self/client")
-	client.assign_ver("0.1.2")
+	client.assign_ver("0.1.3")
 	return client
 end
 

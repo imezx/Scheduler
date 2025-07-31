@@ -67,7 +67,8 @@ server.init = function(Profiler)
 		if not active_sockets[sender] or not sender:HasTag("__allowedScheduler__") or type(state) ~= "boolean" then
 			return
 		end
-		if state then
+		Profiler.reset()
+		if state == true then
 			Profiler.Resume()
 		else
 			Profiler.Pause()
@@ -90,7 +91,7 @@ server.init = function(Profiler)
 		render_gpu_frame_time += Stats.RenderGPUFrameTime
 		render_cpu_frame_time += Stats.RenderCPUFrameTime
 
-		if acccumulate > SEND_EVERY then
+		if acccumulate > SEND_EVERY and Profiler.isRunning then
 			if next(active_sockets) then
 				local runTime: string = convert_units("s", Profiler.RunTime())
 				local exported_scheduler: { { Name: string, Duration: number, Color: Color3 } } = Profiler.dump_frames()
