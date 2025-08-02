@@ -1,4 +1,3 @@
---!strict
 --!optimize 2
 --!native
 local Profiler = {}
@@ -30,7 +29,13 @@ type socket_transcript_type_inner = {
 }
 type socket_transcript_type = { socket_transcript_type_inner }
 
-local activeTimers: { [thread]: { name: string, startTime: number } } = {}
+type TimerInfo = {
+	name: string,
+	startTime: number,
+	overhead: number,
+}
+
+local activeTimers: { [thread]: { TimerInfo } } = {}
 local frameSystems: { { Name: string, Duration: number, Color: Color3 } } = {}
 local colorCache: { [string]: Color3 } = {}
 local sockets: { [Player | string]: socket_array_map } = {}
@@ -144,35 +149,47 @@ Profiler.Begin = function(name: string)
 	if not Profiler.isRunning or not profiler_state then
 		return
 	end
-	-- using thread based is the best solution for race condition issues.
 	local currentThread: thread = coroutine.running()
-	if activeTimers[currentThread] then
-		return
+	if not activeTimers[currentThread] then
+		activeTimers[currentThread] = {}
 	end
-	activeTimers[currentThread] = {
+	local startOverhead = os.clock()
+	table.insert(activeTimers[currentThread], {
 		name = name,
-		startTime = os.clock(),
-	}
+		startTime = startOverhead,
+		overhead = os.clock() - startOverhead,
+	})
 end
 
 Profiler.End = function(name: string)
-	local endTime: number = os.clock()
 	if not Profiler.isRunning or not profiler_state then
 		return
 	end
+	local endOverhead: number = os.clock()
 	local currentThread: thread = coroutine.running()
-	local timerStack: { name: string, startTime: number }? = activeTimers[currentThread]
-	activeTimers[currentThread] = nil -- ensure its removed to prevent unwanted memory leaks
-	if not timerStack or timerStack.name ~= name then
+	local threadTimers: { TimerInfo } = activeTimers[currentThread]
+	if not threadTimers then
 		return
 	end
-	table.insert(frameSystems, {
-		Name = name,
-		Duration = (endTime - timerStack.startTime),
-		Color = generateColor(name),
-	})
-	if (endTime - lastUpdated) >= 1 then
-		lastUpdated = os.clock()
+	for i: number = #threadTimers, 1, -1 do
+		local timer: TimerInfo = threadTimers[i]
+		if timer.name == name then
+			table.remove(threadTimers, i)
+			local duration: number = endOverhead - timer.startTime
+			duration = math.max(0, duration - (timer.overhead + (os.clock() - endOverhead)))
+			table.insert(frameSystems, {
+				Name = name,
+				Duration = duration,
+				Color = generateColor(name),
+			})
+			break
+		end
+	end
+	if not next(threadTimers) then
+		activeTimers[currentThread] = nil
+	end
+	if endOverhead - lastUpdated >= 1 then
+		lastUpdated = endOverhead
 		Profiler.merge(nil, true)
 	end
 end
