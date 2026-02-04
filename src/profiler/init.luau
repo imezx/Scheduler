@@ -32,7 +32,7 @@ type socket_transcript_type = { socket_transcript_type_inner }
 type TimerInfo = {
 	name: string,
 	startTime: number,
-	overhead: number,
+	deductedTime: number,
 }
 
 local activeTimers: { [thread]: { TimerInfo } } = {}
@@ -40,6 +40,27 @@ local frameSystems: { { Name: string, Duration: number, Color: Color3 } } = {}
 local colorCache: { [string]: Color3 } = {}
 local sockets: { [Player | string]: socket_array_map } = {}
 local stores: { [string]: any } = {}
+
+local timerPool: { TimerInfo } = {}
+
+local function allocTimer(name: string, startTime: number): TimerInfo
+	local t = table.remove(timerPool)
+	if t then
+		t.name = name
+		t.startTime = startTime
+		t.deductedTime = 0
+		return t
+	end
+	return {
+		name = name,
+		startTime = startTime,
+		deductedTime = 0,
+	}
+end
+
+local function freeTimer(t: TimerInfo)
+	table.insert(timerPool, t)
+end
 
 local state: (any) -> { any } = vide.source({})
 
@@ -135,61 +156,103 @@ Profiler.merge = function(map_value: { { Name: string, Duration: number, Color: 
 			system.Count += 1
 		end
 	end
+	local sorted = {}
 	for _, system in merged do
 		system.Duration /= system.Count
+		table.insert(sorted, system)
 	end
+	table.sort(sorted, function(a, b)
+		return a.Name < b.Name
+	end)
 	if update_state == nil or update_state then
-		state(merged)
+		state(sorted)
 	end
 	table.clear(frameSystems)
-	return merged
+	return sorted
 end
 
 Profiler.Begin = function(name: string)
 	if not Profiler.isRunning or not profiler_state then
 		return
 	end
+	local startTime = os.clock()
 	local currentThread: thread = coroutine.running()
-	if not activeTimers[currentThread] then
-		activeTimers[currentThread] = {}
+	local threadStack = activeTimers[currentThread]
+	if not threadStack then
+		threadStack = {}
+		activeTimers[currentThread] = threadStack
 	end
-	local startOverhead = os.clock()
-	table.insert(activeTimers[currentThread], {
-		name = name,
-		startTime = startOverhead,
-		overhead = os.clock() - startOverhead,
-	})
+
+	table.insert(threadStack, allocTimer(name, startTime))
+
+	-- overhead compensation
+	local endTime = os.clock()
+	local overhead = endTime - startTime
+	if #threadStack > 1 then
+		threadStack[#threadStack - 1].deductedTime += overhead
+	end
 end
 
 Profiler.End = function(name: string)
 	if not Profiler.isRunning or not profiler_state then
 		return
 	end
-	local endOverhead: number = os.clock()
+	local endStart: number = os.clock()
 	local currentThread: thread = coroutine.running()
 	local threadTimers: { TimerInfo } = activeTimers[currentThread]
 	if not threadTimers then
 		return
 	end
-	for i: number = #threadTimers, 1, -1 do
-		local timer: TimerInfo = threadTimers[i]
-		if timer.name == name then
-			table.remove(threadTimers, i)
-			local duration: number = endOverhead - timer.startTime
-			duration = math.max(0, duration - (timer.overhead + (os.clock() - endOverhead)))
-			table.insert(frameSystems, {
-				Name = name,
-				Duration = duration,
-				Color = generateColor(name),
-			})
-			break
+
+	local lastIndex = #threadTimers
+	if lastIndex > 0 and threadTimers[lastIndex].name == name then
+		local timer = threadTimers[lastIndex]
+		table.remove(threadTimers, lastIndex)
+
+		local duration: number = endStart - timer.startTime - timer.deductedTime
+		if duration < 0 then
+			duration = 0
+		end
+
+		table.insert(frameSystems, {
+			Name = name,
+			Duration = duration,
+			Color = generateColor(name),
+		})
+		freeTimer(timer)
+	else
+		for i: number = lastIndex - 1, 1, -1 do
+			local timer: TimerInfo = threadTimers[i]
+			if timer.name == name then
+				table.remove(threadTimers, i)
+
+				local duration: number = endStart - timer.startTime - timer.deductedTime
+				if duration < 0 then
+					duration = 0
+				end
+
+				table.insert(frameSystems, {
+					Name = name,
+					Duration = duration,
+					Color = generateColor(name),
+				})
+				freeTimer(timer)
+				break
+			end
 		end
 	end
-	if not next(threadTimers) then
+
+	local endFinish = os.clock()
+	local overhead = endFinish - endStart
+	if #threadTimers > 0 then
+		threadTimers[#threadTimers].deductedTime += overhead
+	end
+
+	if #threadTimers == 0 then
 		activeTimers[currentThread] = nil
 	end
-	if endOverhead - lastUpdated >= 1 then
-		lastUpdated = endOverhead
+	if endStart - lastUpdated >= 1 then
+		lastUpdated = endStart
 		Profiler.merge(nil, true)
 	end
 end
@@ -216,7 +279,7 @@ Profiler.store = function(key: string, value: any)
 	stores[key] = value
 end
 
-Profiler.get_stored = function(key: string, value: any): any?
+Profiler.get_stored = function(key: string): any?
 	return stores[key]
 end
 
