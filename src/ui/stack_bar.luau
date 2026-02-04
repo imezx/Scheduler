@@ -22,12 +22,18 @@ return function(props: stack_bar)
 		Name = "Graph",
 		Size = UDim2.new(1, 0, 0, 32),
 		indexes(props.values, function(value, index)
-			local data = value()
 			return create("Frame")({
 				Size = function()
-					return UDim2.fromScale(data.Duration / total(), 1)
+					local duration = value().Duration
+					local totalDuration = total()
+					if totalDuration == 0 then
+						return UDim2.fromScale(0, 1)
+					end
+					return UDim2.fromScale(duration / totalDuration, 1)
 				end,
-				BackgroundColor3 = data.Color,
+				BackgroundColor3 = function()
+					return value().Color
+				end,
 				MouseEnter = function()
 					props.selected(index)
 				end,

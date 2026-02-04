@@ -2,6 +2,7 @@
 local vide = require("../../vide")
 local pebble = require("../../pebble")
 local stack_bar = require("./stack_bar")
+local convert_scale = require("../util/convert_scale")
 
 type SchedulerProps = {
 	env: string,
@@ -17,7 +18,7 @@ type SchedulerProps = {
 local create = vide.create
 local source = vide.source
 local derive = vide.derive
-local values = vide.values
+local indexes = vide.indexes
 local action = vide.action
 local cleanup = vide.cleanup
 local effect = vide.effect
@@ -38,26 +39,6 @@ local sort_by_options = {
 	"Frame Time",
 }
 
-local function to_computeTime(time: number): string
-	if type(time) ~= "number" or time ~= time then
-		return "unknown"
-	end
-	if time >= 1 then
-		return string.format("%.2fs", time)
-	elseif time >= 0.001 then
-		local ms: number = time * 1e3
-		local formattedMs: number = math.floor(ms * 1e2) / 1e2
-		return `{formattedMs}ms`
-	elseif time >= 0.000001 then
-		local us: number = time * 1e6
-		local formattedUs: number = math.floor(us * 1e2) / 1e2
-		return `{formattedUs}µs`
-	end
-	local ns: number = time * 1e9
-	local formattedNs: number = math.floor(ns * 1e2) / 1e2
-	return `{formattedNs}ns`
-end
-
 return function(props: SchedulerProps)
 	local selected: (number?) -> number = source(0)
 	local sort_by: (number?) -> number = source(2)
@@ -71,14 +52,16 @@ return function(props: SchedulerProps)
 		return total
 	end)
 
-	local function assign_frame(data: { Name: string, Color: Color3, Size: UDim2, Duration: number })
+	local function assign_frame(value_accessor, index)
 		local gui_state = source(Enum.GuiState.Idle)
 		local _frame: Frame
 		local b = create("ImageButton")({
-			Name = data.Name,
+			Name = function()
+				return value_accessor().Name
+			end,
 			Size = UDim2.new(1, 0, 0, 32),
 			LayoutOrder = function()
-				return 1e9 - data.Duration * 1e8
+				return 1e9 - value_accessor().Duration * 1e8
 			end,
 			BackgroundColor3 = function()
 				return if gui_state() == Enum.GuiState.Press
@@ -97,7 +80,7 @@ return function(props: SchedulerProps)
 						Position = UDim2.new(0, 0, 1, 4),
 						AnchorPoint = Vector2.new(0, 1),
 						Size = function()
-							return UDim2.new(data.Duration / totalRuntime(), 0, 0, 1)
+							return UDim2.new(value_accessor().Duration / totalRuntime(), 0, 0, 1)
 						end,
 						BackgroundColor3 = pebble.theme.fg_on_bg_high[0],
 					})
@@ -107,7 +90,7 @@ return function(props: SchedulerProps)
 					if not _frame then
 						return
 					end
-					_frame.Size = UDim2.new(data.Duration / totalRuntime(), 0, 0, 1)
+					_frame.Size = UDim2.new(value_accessor().Duration / totalRuntime(), 0, 0, 1)
 				end),
 			}),
 
@@ -133,7 +116,9 @@ return function(props: SchedulerProps)
 			create("Frame")({
 				Size = UDim2.fromOffset(16, 16),
 				AnchorPoint = Vector2.new(0.5, 0.5),
-				BackgroundColor3 = data.Color,
+				BackgroundColor3 = function()
+					return value_accessor().Color
+				end,
 				create("UICorner")({
 					CornerRadius = UDim.new(1, 0),
 				}),
@@ -141,7 +126,9 @@ return function(props: SchedulerProps)
 
 			pebble.typography({
 				automaticsize = Enum.AutomaticSize.None,
-				text = data.Name,
+				text = function()
+					return value_accessor().Name
+				end,
 
 				truncate = Enum.TextTruncate.SplitWord,
 				xalignment = Enum.TextXAlignment.Left,
@@ -156,7 +143,9 @@ return function(props: SchedulerProps)
 
 			pebble.typography({
 				automaticsize = Enum.AutomaticSize.XY,
-				text = to_computeTime(data.Duration),
+				text = function()
+					return convert_scale("s", value_accessor().Duration)
+				end,
 				xalignment = Enum.TextXAlignment.Right,
 				disabled = true,
 			}),
@@ -206,7 +195,7 @@ return function(props: SchedulerProps)
 							return `Runtime: {props.Runtime}`
 						end or function()
 							local time: number = totalRuntime()
-							return `Run time: {to_computeTime(time)}`
+							return `Run time: {convert_scale("s", time)}`
 						end,
 					}),
 
@@ -271,7 +260,7 @@ return function(props: SchedulerProps)
 					x = UDim.new(0, 1),
 				}),
 
-				values(props.ProfilerState, assign_frame),
+				indexes(props.ProfilerState, assign_frame),
 			}),
 		}),
 	})
